@@ -1,0 +1,446 @@
+#+title: A clojure crash course.
+
+* Form
+Clojure recognize 2 kinds of structures:
+1. Literal rappresentation of data structures (numbers, strings, maps, vectors, lists)
+2. Operation
+
+A valid ~code~ is called *Form*, here some example:
+** Literal rappresentation
+#+begin_src clojure
+1
+"a string"
+["a" "vector" "of" "string"]
+#+end_src
+** Operation
+#+begin_src clojure
+(+ 1 2 3 4 5 6 7 8 9 10)
+(str "It was the panda " "in the library " "with a dust buster")
+#+end_src
+
+#+RESULTS:
+|                                                   55 |
+| "It was the panda in the library with a dust buster" |
+* Control flow
+** If
+#+begin_src clojure
+(if boolean-form
+  then-form
+  else-form)
+#+end_src
+
+Example:
+#+begin_src clojure
+(defn even? [x]
+  (if (= (mod x 2) 0)
+    true
+    false))
+
+(even? 10)
+(even? 11)
+#+end_src
+
+#+RESULTS:
+| #'user/even? |
+| true         |
+| false        |
+** Do
+Extend ~then, else form~.
+#+begin_src clojure
+(if boolean-form
+  (do
+    (then-form-1)
+    (then-form-2)
+    (...)
+    (then-form-n))
+  (do
+    (else-form-1)
+    (else-form-2)
+    (...)
+    (else-form-n)))
+#+end_src
+** When
+It's a combination of ~if~ and ~do~, it let you write the ~then-form~ without use the ~do~, it doesn't support the ~else branch~
+#+begin_src clojure
+(when boolean-form
+    (then-form-1)
+    (then-form-2)
+    (...)
+    (then-form-n))
+#+end_src
+** Truthiness and falsiness
+#+begin_src clojure
+(map (fn [x] (if x "true" "false"))
+        '(nil false true 1 3.14159 "clojure is cool" (= 1 1) (= 1 0)))
+#+end_src
+
+#+RESULTS:
+| false | false | true | true | true | true | true | true | true |
+
+#+begin_src clojure
+(= 1 0)
+(= 1 1)
+(= "ciao" "hello")
+(= "hello" "hello")
+#+end_src
+
+#+RESULTS:
+| false |
+| true  |
+| false |
+| true  |
+
+#+begin_src clojure
+(or nil nil nil nil "Hello" "I'm also true" nil)
+(or nil "first true value" nil nil "Hello" "I'm also true" nil)
+(or nil nil nil nil nil (= "None of us is" "true"))
+(or nil nil nil nil nil (= "None of us is" "true") nil)
+#+end_src
+
+#+RESULTS:
+| "Hello"            |
+| "first true value" |
+| false              |
+| nil                |
+
+#+begin_src clojure
+(and 1 2 3 4 5)
+(and 1 2 3 4 5 nil)
+(and 1 false 2 3 4 5)
+#+end_src
+
+#+RESULTS:
+| 5     |
+| nil   |
+| false |
+
+#+begin_src clojure
+(not nil)
+(not false)
+(not true)
+(not "I'm true")
+#+end_src
+
+#+RESULTS:
+| true  |
+| true  |
+| false |
+| false |
+* Naming value with def
+#+begin_src clojure
+(def failed-protagonist-names
+  ["Larry Potter" "Doreen the Explorer" "The Incredible Bulk"])
+#+end_src
+
+#+RESULTS:
+: #'user/failed-protagonist-names
+* Data Strucures
+** Numbers
+Clojure can reresent ~int~, ~double~, ~ratio~.
+See [[https://clojure.org/data_structures#Data%20Structures-Numbers][this link]], for more information.
+#+begin_src clojure
+93
+1.2
+1/5
+#+end_src
+
+#+RESULTS:
+|  93 |
+| 1.2 |
+| 1/5 |
+** Strings
+#+begin_src clojure
+(def name "Chewbacca")
+(str "\"Uggllglglglglglglll\" - " name)
+#+end_src
+
+#+RESULTS:
+| #'user/name                           |
+| "\"Uggllglglglglglglll\" - Chewbacca" |
+** Maps
+#+begin_src clojure
+;; empty map
+{}
+;; a typical clojure map
+{:name "Elija" :last "Bailey"}
+;; map a string to a function.
+{"string-key" +}
+;; nested map describing a back pack and it's content.
+{:name {:first "John" :middle "Jacob" :last "Jingle"}}
+
+#+end_src
+
+#+RESULTS:
+: Please reevaluate when nREPL is connected
+
+#+begin_src clojure
+(hash-map :a 1 :c 2 :b 3)
+(s)
+#+end_src
+
+#+RESULTS:
+| :b | 2 | :a | 1 |
+
+#+begin_src clojure
+(get {:a "hello" :b "world" :c "!"} :a)
+(:a {:a "hello" :b "world" :c "!"})
+({:a "hello" :b "world" :c "!"} :a)
+(get-in {:a {:b "hello"} :b "world" :c "!"} [:a])
+(get-in {:a {:b "hello"} :b "world" :c "!"} [:a :b])
+#+end_src
+
+#+RESULTS:
+| "hello"      |
+| "hello"      |
+| "hello"      |
+| {:b "hello"} |
+| "hello"      |
+
+
+** Keywords
+#+begin_src clojure
+:a
+:b
+:label
+:map-key
+#+end_src
+
+#+RESULTS:
+| :a       |
+| :b       |
+| :label   |
+| :map-key |
+
+#+begin_src clojure
+(:a {:a "value 1" :b "value 2"})
+#+end_src
+
+#+RESULTS:
+: value 1
+* Putting all together
+** Hobbit asymetric model
+#+begin_src clojure
+(def asym-hobbit-body-parts [{:name "head" :size 3}
+                             {:name "left-eye" :size 1}
+                             {:name "left-ear" :size 1}
+                             {:name "mouth" :size 1}
+                             {:name "nose" :size 1}
+                             {:name "neck" :size 2}
+                             {:name "left-shoulder" :size 3}
+                             {:name "left-upper-arm" :size 3}
+                             {:name "chest" :size 10}
+                             {:name "back" :size 10}
+                             {:name "left-forearm" :size 3}
+                             {:name "left-hand" :size 6}
+                             {:name "left-knee" :size 2}
+                             {:name "left-thigh" :size 2}
+                             {:name "left-lower-leg" :size 4}
+                             {:name "left-achilles" :size 1}
+                             {:name "left-foot" :size 2}])
+#+end_src
+
+#+RESULTS:
+: #'user/asym-hobbit-body-parts
+
+** Symmetrize the model
+*** Version 1
+#+begin_src clojure
+(defn matching-part
+  [part]
+  {:name (clojure.string/replace (:name part) #"^left-" "right-")
+   :size (:size part)})
+
+(defn symmetrize-body-parts
+  "Expects a seq of maps that have a :name and :size"
+  [asym-body-parts]
+  (loop [remaining-asym-parts asym-body-parts
+         final-body-parts []]
+    (if (empty? remaining-asym-parts)
+      final-body-parts
+      (let [[part & remaining] remaining-asym-parts]
+        (recur remaining
+               (into final-body-parts
+                     (set [part (matching-part part)])))))))
+#+end_src
+
+#+RESULTS:
+| #'user/matching-part         |
+| #'user/symmetrize-body-parts |
+*** Version 2
+Use reduce to implement a better symmetrize funcion.
+#+begin_src clojure
+(defn symmetrize-body-parts [asym-body-parts]
+  "Expects a seq of maps that have a :name and :size"
+  [asym-body-parts]
+  (reduce
+   (fn [final-body-parts part]
+     (into final-body-parts (set [part (matching-part part)])))
+   []
+   asym-body-parts))
+#+end_src
+
+#+RESULTS:
+: #'user/symmetrize-body-parts
+** Hobbit violence
+#+begin_src clojure
+(defn hit
+  [asym-body-parts]
+  (let [sym-parts (symmetrize-body-parts asym-body-parts)
+        body-parts-size-sum (reduce + (map :size sym-parts))
+        target (rand body-parts-size-sum)]
+    (loop [[part & remaining] sym-parts
+           accumulated-size (:size part)]
+      (if (> accumulated-size target)
+        part
+        (recur remaining (+ accumulated-size (:size (first remaining))))))))
+#+end_src
+
+#+RESULTS:
+: #'user/hit
+* Exercise
+** Exercise 1
+Use str, vector, list, hash-map and hash-set function.
+#+begin_src clojure
+;; str
+(map str [1 2 3 4 5 6 7 8 9 10])
+
+;; vector, a nice convert example
+(apply vector '(1 2 3 4 5 6 7 8 9 10))
+
+;; list, a nice dual example
+(apply list [1 2 3 4 5 6 7 8 9 10])
+
+;; hash-map, spot the difference
+(apply hash-map '(:first "1" :second "2" :third "3" :fourth "4" :fifth "5"))
+(apply hash-map '(:first "1" :second "2" :third "3" :fourth "4" :fifth "5" :fifth "5"))
+(apply hash-map '(:first "1" :second "2" :third "3" :fourth "4" :fifth "5" :fifth "6"))
+
+(hash-map :first "1" :second "2" :third "3" :fourth "4" :fifth "5")
+(hash-map :first "1" :second "2" :third "3" :fourth "4" :fifth "5" :fifth "5")
+(hash-map :first "1" :second "2" :third "3" :fourth "4" :fifth "5" :fifth "6")
+
+;; hash-set
+(hash-set "A " "Set" :with (rand) 570033)
+(hash-set "A " "Set" :with :more rand 570033 + "an extra")
+#+end_src
+
+#+RESULTS:
+| ("1" "2" "3" "4" "5" "6" "7" "8" "9" "10")                                                         |
+| [1 2 3 4 5 6 7 8 9 10]                                                                             |
+| (1 2 3 4 5 6 7 8 9 10)                                                                             |
+| {:fourth "4", :fifth "5", :second "2", :third "3", :first "1"}                                     |
+| {:fourth "4", :fifth "5", :second "2", :third "3", :first "1"}                                     |
+| {:fourth "4", :fifth "6", :second "2", :third "3", :first "1"}                                     |
+| {:fourth "4", :fifth "5", :second "2", :third "3", :first "1"}                                     |
+| {:fourth "4", :fifth "5", :second "2", :third "3", :first "1"}                                     |
+| {:fourth "4", :fifth "6", :second "2", :third "3", :first "1"}                                     |
+| #{570033 0.16089323150817614 :with "A " "Set"}                                                     |
+| #{570033 "an extra" #function[clojure.core/rand] #function[clojure.core/+] :with :more "A " "Set"} |
+** Exercise 2
+Write a function that takes a number and add 100 to it.
+#+begin_src clojure
+(defn add100 [x]
+  "Add 100 to the input."
+  (+ 100 x))
+
+(add100 0)
+(add100 10)
+(add100 100)
+#+end_src
+
+#+RESULTS:
+| #'user/add100 |
+|           100 |
+|           110 |
+|           200 |
+** Exercise 3
+Write a function, ~dec-maker~, that works exactly like the function ~inc-maker~ except with subtraction.
+#+begin_src clojure
+(defn dec-maker [dec]
+  "Return a function that subtract dec from it's input."
+  #(- % dec))
+
+((dec-maker 100) 0)
+((dec-maker 100) 10)
+((dec-maker 100) 100)
+#+end_src
+
+#+RESULTS:
+| #'user/dec-maker |
+|             -100 |
+|              -90 |
+|                0 |
+** Exercise 4
+Write a function, mapset, that works like map except the return is a set, i.e.
+*** Example
+#+begin_src clojure
+(mapset inc [1 1 2 2]) ; => #{2 3}
+#+end_src
+*** Solution
+#+begin_src clojure
+(defn mapset [f coll]
+  "Works like map but return a set instead."
+  (set (map f coll)))
+
+(mapset inc [1 1 2 2])
+(mapset str [1 1 2 2])
+#+end_src
+
+#+RESULTS:
+| #'user/mapset |
+| #{3 2}        |
+| #{"1" "2"}    |
+** Exercise 5
+Create a function that's similar to symmetrize-body-parts excepts that instead of left and right it symmetrize with a 5 radial symmetry.
+This is a tough one (for me!).
+#+begin_src clojure
+(defn matching-radial-part [part radial]
+  {:name (clojure.string/replace (:name part) #"^1-" (str radial "-"))
+   :size (:size part)})
+
+(defn matching-all-5-radial-parts [part]
+  (if (re-find #"^1-" (:name part))
+    (map (fn [index] (matching-radial-part part index)) '(1 2 3 4 5))
+    (vector part)))
+
+(defn symetrize-body-parts-radial-5 [asym-body-parts]
+  (reduce
+   (fn [final-body-parts part]
+     (into final-body-parts (set (matching-all-5-radial-parts part))))
+   []
+   asym-body-parts)))
+#+end_src
+
+#+RESULTS:
+| #'user/matching-part-radial          |
+| #'user/matching-all-5-radial-parts   |
+| #'user/symetrize-body-parts-radial-5 |
+** Exercise 6
+Generalize /exercise 5/ to a /n-radial alien/.
+#+begin_src clojure
+(defn matching-radial-part [part radial]
+  {:name (clojure.string/replace (:name part) #"^1-" (str radial "-"))
+   :size (:size part)})
+
+(defn make-vector-from-1-to-n [n]
+  (loop [final [] iter 1]
+    (if (> iter n)
+      final
+      (recur
+       (conj final iter)
+       (inc iter)))))
+
+(defn matching-all-n-radial-parts [part n]
+  (if (re-find #"^1-" (:name part))
+    (map (fn [index] (matching-radial-part part index)) (make-vector-from-1-to-n n))
+    (vector part)))
+
+(defn symetrize-body-parts-radial-n [asym-body-parts n]
+  (reduce
+   (fn [final-body-parts part]
+     (into final-body-parts (set (matching-all-n-radial-parts part n))))
+   []
+   asym-body-parts)))
+#+end_src
+*** Note
+Try to find out if there are list comprehension like in haskell.

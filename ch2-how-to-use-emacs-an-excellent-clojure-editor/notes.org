@@ -1,0 +1,5 @@
+#+title: configure emacs for clojure programming.
+
+* Checkout
++ Paredit
++ cider better integration
