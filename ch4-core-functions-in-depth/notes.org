@@ -1,0 +1,193 @@
+#+title: Core functions in depth
+
+* Programming to Abstraction.
+** Sequence abstraction
+In clojure each data structures that support the operation of:
++ ~cons~
++ ~rest~
++ ~first~
+Can be treated as a ~sequence~, now a big part of the ~clojure core function~ are implemented on sequence, hence each data structure that implements the ~sequence~ contract can use them (polymorphism set aside, basically 🤓).
+*** Example
+In clojure the follwing data strucutres implements the sequence contract:
++ ~list~
++ ~vector~
++ ~map~
++ ~set~
++ I think many more
+#+begin_src clojure
+(defn titleize [topic]
+  (str topic " for the brave and true"))
+
+(map titleize ["Hamster" "Ragnarok"])
+
+(map titleize '("Empathy" "Decorating"))
+
+(map titleize #{"Elbows" "Soap Carving"})
+
+(map #(titleize (second %)) {:uncomfortable-thing "Winking"})
+#+end_src
+
+#+RESULTS:
+| #'user/titleize                                                         |
+| ("Hamster for the brave and true" "Ragnarok for the brave and true")    |
+| ("Empathy for the brave and true" "Decorating for the brave and true")  |
+| ("Elbows for the brave and true" "Soap Carving for the brave and true") |
+| ("Winking for the brave and true")                                      |
+** How clojure handle indirection
+Clojure have different implemetation for different data structures, all with the same name.
+It reminds the polymorphism.
+When a ~/polymorphic/~ (it's not polimorphic, but this help.) function is called, clojure first transform the input to the more general ds and then apply the function.
+Example, for ~map, filter, conj, etc...~, it transform (a sort of lightweight cast) to a ~sequence~ and the use ~first, rest & cons~ internally to the function to take out the computation.
+** Which DS use Sequence?
++ List
++ Vector
++ Map
++ Set
+Basically all of them.
+* Seq Function Examples
+** Map
+*** Example 1
+#+begin_src clojure
+(def human-consumption [8.1 7.3 6.6 5.0])
+(def critter-consumption [0.0 0.2 0.3 1.1])
+
+(defn unify-diet-data
+  [human critter]
+  {:human human :critter critter})
+
+(map unify-diet-data human-consumption critter-consumption)
+#+end_src
+
+#+RESULTS:
+| #'user/human-consumption                                                                                      |
+| #'user/critter-consumption                                                                                    |
+| #'user/unify-diet-data                                                                                        |
+| ({:human 8.1, :critter 0.0} {:human 7.3, :critter 0.2} {:human 6.6, :critter 0.3} {:human 5.0, :critter 1.1}) |
+*** Example 2
+#+begin_src clojure
+(def sum #(reduce + %))
+(def avg #(/ (sum %) (count %)))
+
+(defn stats
+  [numbers]
+  (map #(% numbers) [sum count avg]))
+
+(stats [2 4 10])
+(stats [80 1 44 13 6])
+#+end_src
+
+#+RESULTS:
+| #'user/sum    |
+| #'user/avg    |
+| #'user/stats  |
+| (16 3 16/3)   |
+| (144 5 144/5) |
+*** Example 3
+#+begin_src clojure
+(def identifies
+  [{:alias "Batman" :real "Bruce Wayne"}
+   {:alias "Spider-Man" :real "Peter Parker"}
+   {:alias "Santa Claus" :real "Your mom"}
+   {:alias "Easter Bunny" :real "Your dad"}])
+
+(map :real identifies)
+#+end_src
+
+#+RESULTS:
+| #'user/identifies                             |   |
+| class clojure.lang.Compiler$CompilerException | * |
+|                                               |   |
+* Test
+#+begin_src clojure
+(defn even-numbers
+  ([] (even-numbers 0))
+  ([n] (cons n (lazy-seq (even-numbers (+ n 2))))))
+
+(take 10 (even-numbers))
+
+;; I don't like this behaviour, this is more "Even spaced" number
+(take 10 (even-numbers 1))
+
+(defn better-even-numbers
+  [] (let [even-numbers (fn even-numbers [n] (cons n (lazy-seq (even-numbers (+ n 2)))))]
+       (even-numbers 0)))
+
+(take 10 (better-even-numbers))
+;; (take 10 (better-even-numbers 1)) ;; err
+#+end_src
+
+#+RESULTS:
+: #'user/even-numbers
+
+* Vampire example
+** Part 1
+#+begin_src clojure
+(def human-consumption [8.1 7.3 6.6 5.0])
+(def critter-consumption [0.0 0.2 0.3 1.1])
+
+(defn unify-diet-data
+  [human critter]
+  {:human human :critter critter})
+
+(map unify-diet-data human-consumption critter-consumption)
+#+end_src
+** Part 2
+#+begin_src clojure
+(def food-journal
+  [{:month 1 :day 1 :human 5.3 :critter 2.3}
+   {:month 1 :day 2 :human 5.1 :critter 2.0}
+   {:month 2 :day 1 :human 4.9 :critter 2.1}
+   {:month 2 :day 2 :human 5.0 :critter 2.5}
+   {:month 3 :day 1 :human 4.2 :critter 3.3}
+   {:month 3 :day 2 :human 4.0 :critter 3.8}
+   {:month 4 :day 1 :human 3.7 :critter 3.9}
+   {:month 4 :day 2 :human 3.7 :critter 3.6}])
+
+(take-while #(< (:month %) 3) food-journal)
+
+(drop-while #(< (:month %) 3) food-journal)
+
+(take-while #(< (:month %) 3) (drop-while #(< (:month %) 2) food-journal))
+
+(filter #(< (:human %) 5) food-journal)
+
+(filter #(< (:month %) 3) food-journal)
+
+(filter #(< 1 (:month %) 4) food-journal)
+
+(some #( > (:critter %) 5) food-journal)
+#+end_src
+
+#+RESULTS:
+| #'user/food-journal                                                                                                                                                                                                                |
+| ({:month 1, :day 1, :human 5.3, :critter 2.3} {:month 1, :day 2, :human 5.1, :critter 2.0} {:month 2, :day 1, :human 4.9, :critter 2.1} {:month 2, :day 2, :human 5.0, :critter 2.5})                                              |
+| ({:month 3, :day 1, :human 4.2, :critter 3.3} {:month 3, :day 2, :human 4.0, :critter 3.8} {:month 4, :day 1, :human 3.7, :critter 3.9} {:month 4, :day 2, :human 3.7, :critter 3.6})                                              |
+| ({:month 2, :day 1, :human 4.9, :critter 2.1} {:month 2, :day 2, :human 5.0, :critter 2.5})                                                                                                                                        |
+| ({:month 2, :day 1, :human 4.9, :critter 2.1} {:month 3, :day 1, :human 4.2, :critter 3.3} {:month 3, :day 2, :human 4.0, :critter 3.8} {:month 4, :day 1, :human 3.7, :critter 3.9} {:month 4, :day 2, :human 3.7, :critter 3.6}) |
+| ({:month 1, :day 1, :human 5.3, :critter 2.3} {:month 1, :day 2, :human 5.1, :critter 2.0} {:month 2, :day 1, :human 4.9, :critter 2.1} {:month 2, :day 2, :human 5.0, :critter 2.5})                                              |
+| ({:month 2, :day 1, :human 4.9, :critter 2.1} {:month 2, :day 2, :human 5.0, :critter 2.5} {:month 3, :day 1, :human 4.2, :critter 3.3} {:month 3, :day 2, :human 4.0, :critter 3.8})                                              |
+** Part 3
+#+begin_src clojure
+(def vampire-database
+  {0 {:makes-blood-puns? false, :has-pulse? true :name "McFishwich"}
+   1 {:makes-blood-puns? false, :has-pulse? true :name "McMackson"}
+   2 {:makes-blood-puns? true, :has-pulse? false :name "Damonn Salvatore"}
+   3 {:makes-blood-puns? true, :has-pulse? true :name "Mickey Mouse"}
+   4 {:makes-blood-puns? true, :has-pulse? false :name "Conte Ddhracula"}})
+
+(defn vampire-related-details
+  [social-security-number]
+  (Thread/sleep 1000)
+  (get vampire-database social-security-number))
+
+(defn vampire? [record]
+  (and (:makes-blood-puns? record)
+       (not (:has-pulse? record))
+       record))
+
+(defn identify-vampire
+  [social-security-numbers]
+  (filter vampire? (map vampire-related-details social-security-numbers)))
+#+end_src
+* FWPD
+See lein project
