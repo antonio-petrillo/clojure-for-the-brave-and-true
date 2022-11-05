@@ -63,11 +63,24 @@
 ;; append a suspect to my _list_ of suspects
 (def append conj)
 
+;; Maybe the author expect this.
+(defn append [suspects suspect]
+  (conj suspects suspect))
+
 ;; Exercise 3
 ;; Validate a suspect entyr (must have name and glitter-index)
 ;; Don't use :pre and :post form
 (defn valid? [{:keys [name glitter-index]}]
   (and name glitter-index true))
+
+;; ERR, the function need to take a list of all keyword to validate
+;; (defn valid? [to-validate record]
+;;   (and (map #(get record %) to-validate)))
+;; apparently this don't work because /and/ is a macro.
+
+(defn valid? [to-validates record]
+  (reduce (fn [acc to-validate] (and acc (not (nil? (get record to-validate))))) true to-validates))
+
 
 ;; Exercise 4
 ;; Turn the records back to csv format.
