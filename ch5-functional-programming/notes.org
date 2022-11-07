@@ -1,0 +1,260 @@
+#+title: Functional Programming
+
+* Pure Functions: What and Why
+They make easier for the programmer to reason about the programs, because function are isolated.
+Pure functions are more predictable.
+If a pure function is correct it will be correct forever (this an oversimplification), if the programs behave incorrectly it is caused by some other function.
+Pure function have 2 main properties:
+** Referential Transparency
+The always return the same output on the same input.
+~rand~ is not referential transparent because on different call return different value, au contrair ~inc~ is ref. trasp.
+** Don't have side effects
+The function don't make any changes outside of the function itself.
+~reduce~ don't cause side effect, ~println~ cause side effect, it modify the terminal buffer (if it print to the terminal, of course)
+* Some example
+A function to add a list of numbers.
+** Traditional way
+#+begin_src python :results output
+l = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+sum = 0
+for i in l:
+    sum += i
+print(sum)
+#+end_src
+
+#+RESULTS:
+: 55
+** Clojure way
+#+begin_src clojure
+(def l [1 2 3 4 5 6 7 8 9 10])
+
+(defn sum
+  ([vals] (sum vals 0))
+  ([vals accumulator]
+   (if (empty? vals)
+     accumulator
+     (sum (rest vals) (+ accumulator (first vals))))))
+
+(sum l)
+#+end_src
+
+#+RESULTS:
+| #'user/l   |
+| #'user/sum |
+| 55         |
+* Cool thing to Do with Pure Functions
+** Comp
+*** Example 1
+#+begin_src clojure
+((comp inc *) 2 3)
+#+end_src
+
+#+RESULTS:
+: Please reevaluate when nREPL is connected
+*** Example 2
+#+begin_src clojure
+(def character
+  {:name "Smooches McCutes"
+   :attributes {:intelligence 10
+                :strength 4
+                :dexterity 5}})
+
+(def c-int (comp :intelligence :attributes))
+(def c-str (comp :strength :attributes))
+(def c-dex (comp :dexterity :attributes))
+
+(c-int character)
+(c-str character)
+(c-dex character)
+
+(defn spell-slots [character]
+  (int (inc (/ (c-int character) 2))))
+
+;; a more readable with comp
+
+(def spell-slots-comp (comp int inc #(/ % 2 ) c-int))
+
+(spell-slots character)
+(spell-slots-comp character)
+#+end_src
+
+#+RESULTS:
+| #'user/character        |
+| #'user/c-int            |
+| #'user/c-str            |
+| #'user/c-dex            |
+| 10                      |
+| 4                       |
+| 5                       |
+| #'user/spell-slots      |
+| #'user/spell-slots-comp |
+| 6                       |
+| 6                       |
+** Two Comp
+A comp on only 2 function
+#+begin_src clojure
+(defn two-comp [f g]
+  (fn [& args]
+    (f (apply g args))))
+
+((two-comp inc dec) 2)
+#+end_src
+
+#+RESULTS:
+| #'user/two-comp |
+|               2 |
+** My Comp
+#+begin_src clojure
+(defn my-comp [& functions]
+  (reduce (fn [composed-so-far current-function]
+            (fn [& args]
+              (composed-so-far (apply current-function args))))
+          identity
+          functions))
+
+((my-comp inc inc inc inc inc inc inc inc inc) 1)
+#+end_src
+
+#+RESULTS:
+| #'user/my-comp |
+|             10 |
+* Memoize
+With ~memoize~ clojure store the result of a function on a given input, so late it don't need to recalculate.
+** Not memoize
+#+begin_src clojure
+(defn sleepy-identity
+  "Return  the given value after 1 second."
+  [x]
+  (Thread/sleep 1000)
+  x)
+
+(sleepy-identity "Mr. Fantastico")
+(sleepy-identity "Mr. Fantastico")
+#+end_src
+
+#+RESULTS:
+| #'user/sleepy-identity |
+| "Mr. Fantastico"       |
+| "Mr. Fantastico"       |
+
+Every time ~sleepy-identity~ is called on ~"Mr. Fantastico"~ it wait for 1 second.
+** Memoize
+#+begin_src clojure
+(def memoize-sleepy-identity
+  "Memoize version of sleepy identity."
+  (memoize sleepy-identity))
+
+(memoize-sleepy-identity "Mr. Fantastico")
+(memoize-sleepy-identity "Mr. Fantastico")
+#+end_src
+
+#+RESULTS:
+| #'user/memoize-sleepy-identity |
+| "Mr. Fantastico"               |
+| "Mr. Fantastico"               |
+
+Now after the first call the function return immediately, because the result on ~"Mr. Fantastico"~ is memoized.
+* Peg thing
+See leiningen project
+* Exercise 1
+Write a function like ~(attr :intelligence)~ that behave like ~(comp :intelligence :attributes)~.
+#+begin_src clojure
+(def attr
+  (fn [attribute]
+    #(get (get % :attributes ) attribute)))
+
+(defn attr
+  [attribute]
+  #(get-in % [:attributes attribute]))
+
+(defn attr
+  [attribute]
+  (comp attribute :attributes))
+#+end_src
+
+#+RESULTS:
+| #'user/attr |
+| #'user/attr |
+
+* Exercise 2
+Implement the comp function:
+#+begin_src clojure
+(defn my-comp [& functions]
+  (reduce (fn [composed-so-far current-function]
+            (fn [& args]
+              (current-function (apply composed-so-far args))))
+          identity
+          functions))
+#+end_src
+* Exercise 3
+Implement ~assoc-in~.
+Hint:
++ Use ~assoc~ function
++ The parameter taken by ~assoc-in~ is ~[m [k & ks] v]~
+#+begin_src clojure
+(defn my-assoc-in
+  [m [k & ks] v]
+  (if ks
+    (assoc m k (assoc-in (get m k) ks v))
+    (assoc m k v)))
+#+end_src
+
+#+RESULTS:
+: #'user/my-assoc-in
+
+I struggled a bit with this exercise, this is the [[https://github.com/clojure/clojure/blob/master/src/clj/clojure/core.clj#L5596][clojure internal implemntation]], now if I re read the solution is quite understandable:
+1. ~(defn my-assoc-in~ :=> Just the function definition
+2. ~[m [k & ks] v]~ :=> The function signature hint given by the book
+3. ~(if ks~ :=> If I don't have any more keys to process
+4. ~(assoc m k (assoc-in (get m k) ks v))~
+   In the case I have other keys to process I need to update a nested map.
+   So I assoc the current map at the current keys with the new inner map, this means that I need to use assoc on the inner map, hence I call recursively assoc-in on the inner map (getted with ~(get m k)~), the remaining keys and the value v, this will return the update ~inner~ map.
+5. ~(assoc m k v)))~, k is the last key so I need only a normal assoc in this case.
+* Exercise 4
+Lookup, and use, at ~update-in~ function.
+#+begin_src clojure
+(update-in {:a {:b {:c "hello"}}} [:a :b :c] #(.toUpperCase %))
+(update-in {:a {:b {:c 1}}} [:a :b :c] + 9 )
+(update-in {:a {:b {:c 1}}} [:a :b :c] + 2 3 4 5 6 7 8 9 10)
+#+end_src
+
+#+RESULTS:
+| {:a {:b {:c "HELLO"}}} |
+| {:a {:b {:c 10}}}      |
+| {:a {:b {:c 55}}}      |
+
+* Exercise 5
+Implement ~update-in~.
+#+begin_src clojure
+;; Maybe this is not the most efficient implementation.
+(defn my-update-in
+  [m ks f & args]
+  (let [v (get-in m ks)]
+    (assoc-in m ks (apply f v args))))
+
+(my-update-in {:a {:b {:c "hello"}}} [:a :b :c] #(.toUpperCase %))
+(my-update-in {:a {:b {:c 1}}} [:a :b :c] + 9 )
+(my-update-in {:a {:b {:c 1}}} [:a :b :c] + 2 3 4 5 6 7 8 9 10)
+
+;; I don't know if this is more efficient, it seems but who knows really?
+(defn my-update-in-2
+  [m [k & ks] f & args]
+  (let [v (get m k)]
+    (if ks
+      (assoc m k (apply (partial my-update-in-2 v ks f) args))
+      (assoc m k (apply f v args)))))
+
+(my-update-in-2 {:a {:b {:c "hello"}}} [:a :b :c] #(.toUpperCase %))
+(my-update-in-2 {:a {:b {:c 1}}} [:a :b :c] + 9 )
+(my-update-in-2 {:a {:b {:c 1}}} [:a :b :c] + 2 3 4 5 6 7 8 9 10)
+#+end_src
+
+#+RESULTS:
+| #'user/my-update-in    |
+| {:a {:b {:c "HELLO"}}} |
+| {:a {:b {:c 10}}}      |
+| {:a {:b {:c 55}}}      |
+| #'user/my-update-in-2  |
+| {:a {:b {:c "HELLO"}}} |
+| {:a {:b {:c 10}}}      |
+| {:a {:b {:c 55}}}      |
