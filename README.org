@@ -1,1 +1,7 @@
 This repo contains my solution to the book [[https://www.braveclojure.com/][clojure for the brave and true]].
+
+* Best quotes
+** Page 133
+#+begin_quote
+To kill two birds with one stone (or feed two birds with one seed, depending on how much hippie you are.)
+#+end_quote

@@ -1,0 +1,174 @@
+#+title:Organizing your project: A librarian's tale
+
+* Your project as a Library
+#+begin_src clojure
+(ns-name *ns*)
+inc
+'inc
+(map inc [1 2])
+'(map inc [1 2])
+(eval '(map inc [1 2]))
+(eval (read-string "(map inc [1 2])"))
+#+end_src
+
+#+RESULTS:
+[nto@fedora ch6-organizing-your-project-a-librarian-s-tale]$ head -31 notes.org
+#+title:Organizing your project: A librarian's tale
+
+* Your project as a Library
+#+begin_src clojure
+(ns-name *ns*)
+inc
+'inc
+(map inc [1 2])
+'(map inc [1 2])
+(eval '(map inc [1 2]))
+(eval (read-string "(map inc [1 2])"))
+#+end_src
+
+#+RESULTS:
+: Please reevaluate when nREPL is connected
+* Storing Objects with def
+~def~ is used to store object in clojure /library/.
+#+begin_src clojure
+(def great-books ["East of Eden" "The Glass Bead Game"])
+great-books
+#+end_src
+
+#+RESULTS:
+| #'user/great-books                     |
+| ["East of Eden" "The Glass Bead Game"] |
+This process is called ~internig~ a var, it's also possible to check iterned variable.
+#+begin_src clojure
+(ns-interns *ns*)
+(get (ns-interns *ns*) 'great-books)
+#+end_src
+
+#+RESULTS:
+| {great-books #'user/great-books} |
+| #'user/great-books               |
+Get the variable associated with the symbol, this is the reader form.
+It's also possible to get the ~full~ map that the namespaces uses to lookup a var when a symbol is given.
+#+begin_src clojure
+(ns-map *ns*)
+#+end_src
+The /default/ namespaces is to crowd to print the output here, there are, at this moment, ~777~ entry.
+** Deref
+~#'~ let you grab the var corresponding to the symbol that follows.
+It's like grabbing the shelf index where the value is stored.
+Deref the reader form is like go to the shel and grab the value.
+#+begin_src clojure
+great-books
+(deref #'user/great-books)
+#+end_src
+
+#+RESULTS:
+| ["East of Eden" "The Glass Bead Game"] |
+| ["East of Eden" "The Glass Bead Game"] |
+** Name collision
+If there is a name collision I can no longer access the previous value.
+#+begin_src clojure
+(def great-books ["East of Eden" "The Glass Bead Game"])
+great-books
+(def great-books ["The Power of Bees" "Journey to Upstairs"])
+great-books
+#+end_src
+
+#+RESULTS:
+| #'user/great-books                          |
+| ["East of Eden" "The Glass Bead Game"]      |
+| #'user/great-books                          |
+| ["The Power of Bees" "Journey to Upstairs"] |
+* Create namespaces
+In clojure there are 3 way to create namespaces:
++ ~create-ns~ function.
++ ~in-ns~ function.
++ ~ns~ macro.
+** create-ns
+take a symbol and creates a namspaces with that name if doesn't exist already.
+#+begin_src clojure
+(create-ns 'papa.pujaz)
+#+end_src
+#+RESULTS:
+: #namespace[papa.pujaz]
+This is not very useful, because it don't enter the namespace.
+** in-ns
+It's like ~create-ns~ but also switch to it.
+#+begin_src clojure
+(in-ns 'sucuz.zone)
+#+end_src
+#+RESULTS:
+: #namespace[sucuz.zone]
+*** Fully qualified name
+#+begin_src clojure
+(in-ns 'cheese.analysis)
+
+(in-ns 'cheese.taxonomy)
+(def cheddars ["mild" "medium" "strong" "sharp" "extra sharp"])
+
+(in-ns 'cheese.analysis)
+cheddars
+#+end_src
+
+#+RESULTS:
+| #namespace[cheese.analysis]                   |
+| #namespace[cheese.taxonomy]                   |
+| #'cheese.taxonomy/cheddars                    |
+| #namespace[cheese.analysis]                   |
+| class clojure.lang.Compiler$CompilerException |
+It can't find ~cheddars~ because is in another ns.
+#+begin_src clojure
+(in-ns 'cheese.analysis)
+
+(in-ns 'cheese.taxonomy)
+(def cheddars ["mild" "medium" "strong" "sharp" "extra sharp"])
+
+(in-ns 'cheese.analysis)
+cheese.taxonomy/cheddars
+#+end_src
+This and the following example work better in the REPL.
+** Refer
+#+begin_src clojure
+(in-ns 'chees.taxonomy)
+(def cheddars ["mild" "medium" "strong" "sharp" "extra sharp"])
+(def bries ["Wisconsin" "Somerset" "Brie de Meaux" "Brie de Melum"])
+(in-ns 'cheese.analysis)
+(clojure.core/refer 'chees.taxonomy)
+bries
+cheddars
+#+end_src
+
+#+RESULTS:
+| #namespace[chees.taxonomy]                               |
+| #'chees.taxonomy/cheddars                                |
+| #'chees.taxonomy/bries                                   |
+| #namespace[cheese.analysis]                              |
+| ["Wisconsin" "Somerset" "Brie de Meaux" "Brie de Melum"] |
+| ["mild" "medium" "strong" "sharp" "extra sharp"]         |
+Note this is not the correct way to program in clojure, it is only an example.
+~Refer~ let you refer to the namespaces (given in input as a symbol) without having to use all the fully qualified name, in this case ~chees.taxonomy/bries~ and ~chees.taxonomy/cheddars~.
+This update the current namespace ~symbol/object~ map.
+#+begin_src clojure
+(clojure.core/get (clojure.core/ns-map clojure.core/*ns*) 'bries)
+(clojure.core/get (clojure.core/ns-map clojure.core/*ns*) 'cheddars)
+#+end_src
+
+#+RESULTS:
+| #'chees.taxonomy/bries    |
+| #'chees.taxonomy/cheddars |
+It's also possible to pass some filter to the refer function, like ~:only~, ~:exclude~ and many others.
+** Private function wiht ~defn-~
+It's possible to define a private function, hence visible only to the other function in the same namspaces with ~defn-~ , for the rest is identical to ~defn~.
+** Alias with ~alias~
+Just make an alias to a fully qualified namespaces.
+** Note
+In real clojure development none of the previous example will be used, but it is useful in ~REPL development~ really common in ~lisp~ languages.
+* Real Project Implementation
+See leiningen project.
+** NS
+~ns~ is the primary way to create and manage namespaces wihtin Clojure.
+It's better to call require and refer together
+** The ~ns~ macro
+~create-ns~, ~in-ns~, ~require~, ~use~ are mostly used in the REPL, in source code tipically the macro ~ns~ is used.
+This macro can incorporate all the previous use case.
+** To catch a burblar
