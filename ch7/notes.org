@@ -1,0 +1,209 @@
+#+title:Clojure Alchemy: Reading, Evaluation, and Macros
+
+* Characteristic of Lisp language
+Lisp language are [[https://en.wikipedia.org/wiki/Homoiconicity][homoiconic]] (homo := "the same", icon := "same representation").
+* Example
+#+begin_src clojure
+(defmacro backwards
+  [form]
+  (reverse form))
+
+(backwards (" backwards" " am" "I" str))
+#+end_src
+
+#+RESULTS:
+| #'user/backwards |
+| "I am backwards" |
+
+* Access the AST (Abstract syntax tree)
+** Eval the AST (the code is data, the data is code)
+#+begin_src clojure
+(def addition-list (list + 1 2))
+(def addition-list-alt '(+ 1 2))
+(eval addition-list)
+(eval addition-list-alt)
+#+end_src
+
+#+RESULTS:
+|     #'user/addition-list |
+| #'user/addition-list-alt |
+|                        3 |
+|                        3 |
+** Access of AST
+I can feel the power now.
+#+begin_src clojure
+(eval (concat addition-list [10]))
+(eval (list 'def 'lucky-number (concat addition-list [10])))
+lucky-number
+#+end_src
+
+#+RESULTS:
+|                  13 |
+| #'user/lucky-number |
+|                  13 |
+* The reader
+The reader convert textual source code into clojure data structures (source-code → clojure data structures).
+** Reading
+Consider the following *TEXT* in input to the repl:
+1. ~(str "To understand what recursion is," " you must first understand recursion.")~, this is the textual representation of the data str. is called ~reader-form~.
+2. ~user => (str "To understand what recursion is," " you must first understand recursion.")~.
+3. Then clojure ~eval~ the ~reader-form~.
+4. The REPL produce an output.
+*** Read string
+~read-string~ read a string *WITH* clojure ~reader~.
+#+begin_src clojure
+(read-string "(+ 1 2)")
+; => (+ 1 2)
+#+end_src
+
+The output IS code!
+#+begin_src clojure
+(list? (read-string "(+ 1 2)"))
+#+end_src
+
+#+RESULTS:
+: true
+
+I can modify it
+#+begin_src clojure
+(conj (read-string "(+ 1 2)") :zagglewag)
+#+end_src
+
+#+RESULTS:
+| :zagglewag | + | 1 | 2 |
+*** Reading and evaluating are separated
+#+begin_src clojure
+(eval (read-string "(+ 1 2)"))
+#+end_src
+
+#+RESULTS:
+: 3
+** WTF?
+#+begin_src clojure
+(read-string "#(+ 1 %)")
+(read-string "(#(+ 1 %) 3)")
+(eval (read-string "(#(+ 1 %) 3)"))
+#+end_src
+
+#+RESULTS:
+| (fn* [p1__7655#] (+ 1 p1__7655#))     |
+| ((fn* [p1__7658#] (+ 1 p1__7658#)) 3) |
+| 4                                     |
+** Reader macros
+*** Quote macro *'*
+#+begin_src clojure
+(read-string "'(1 2 3)")
+#+end_src
+
+#+RESULTS:
+| quote | (1 2 3) |
+*** Deref macro *@*
+#+begin_src clojure
+(read-string "@var")
+#+end_src
+
+#+RESULTS:
+| clojure.core/deref | var |
+*** Ignore macro *;*
+#+begin_src clojure
+(read-string "; ignore this line\n(+ 1 2)")
+(eval (read-string "; ignore this line\n(+ 1 2)"))
+#+end_src
+* Macros
+#+begin_src clojure
+(read-string "(1 + 1)")
+(eval (read-string "(1 + 1)"))
+
+(let [infix (read-string "(1 + 1)")]
+  (list (second infix) (first infix) (last infix)))
+
+(eval
+ (let [infix (read-string "(1 + 1)")]
+  (list (second infix) (first infix) (last infix))))
+#+end_src
+
+#+RESULTS:
+| (1 + 1)                            |
+| class java.lang.ClassCastException |
+| (+ 1 1)                            |
+| 2                                  |
+** What are macros good for?
+Macros give you a convenient way to manipulate list before Clojure evaluates them.
+They are similar to a function.
+They are executed in between the reader and the evaluator, so they can manipulate the data structures that will be evaluated.
+#+begin_src clojure
+(defmacro ignore-last-operand
+  [function-call]
+  (butlast function-call))
+
+(ignore-last-operand (+ 1 2 10))
+(ignore-last-operand (+ 1 2 10 (println "Look at me!")))
+#+end_src
+
+#+RESULTS:
+| #'user/ignore-last-operand |
+|                          3 |
+|                         13 |
+In a macro _*symbols are not resolved*_.
+In a function the returned data structures is not evaluated, au contraire in a macro it is evaluated, remember macro live between reader and evaluator,
+hence what they read is not evaluated but what they produce is evaluated.
+** Macro for infix notation
+#+begin_src clojure
+(defmacro infix
+  [infixed]
+  (list (second infixed)
+        (first infixed)
+        (last infixed)))
+
+(infix (1 + 2))
+(macroexpand '(infix (1 + 2)))
+#+end_src
+
+#+RESULTS:
+| #'user/infix |
+| 3            |
+| (+ 1 2)      |
+* Syntactic abstraction and the "->" macro
+This is know as the ~threading~ or ~stabby~ macro.
+#+begin_src clojure
+(defn read-resource
+  "Read a resource into a string"
+  [path]
+  (read-string (slurp (clojure.java.io/resource path))))
+
+;; with the threading macro this become
+(defn read-resource
+  [path]
+  (-> path
+      clojure.java.io/resource
+      slurp
+      read-string))
+#+end_src
+* Exercise 1
+Use the list function, quoting, and read-string to create a list that, when evaluated, prints your first name and your favorite sci-fi movie.
+#+begin_src clojure
+(let [solution (read-string "(list \"Nto\" \"Ghost in the Shell\")")]
+  (eval solution))
+#+end_src
+
+#+RESULTS:
+| Nto | Ghost in the Shell |
+* Exercise 2
+Create an infix function that takes a list like ~(1 + 3 * 4 - 5)~ and tranforms it into the lists that clojure needs in order to correctly evaluate the expression using operator precedence rules.
+#+begin_src clojure
+(defn infix->prefix
+  "Exercise 2, a simple parser for arithmetic with +,-,*,/ without paratheses"
+  [[first second third & remaining]]
+  (if (empty? remaining)
+    (list second first third)
+    (cond (or (= second '+) (= second '-)) (list second first (infix->prefix (conj remaining third)))
+          (or (= second '*) (= second '/)) (list (list second first third) (infix->prefix remaining)))))
+
+(infix->prefix '(1 + 1 - 2 * 2))
+(eval (infix->prefix '(1 + 1 - 2 * 2)))
+#+end_src
+
+#+RESULTS:
+| #'user/infix->prefix |
+| (+ 1 (- 1 (* 2 2)))  |
+| -2                   |

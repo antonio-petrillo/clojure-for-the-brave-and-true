@@ -1,7 +1,11 @@
 This repo contains my solution to the book [[https://www.braveclojure.com/][clojure for the brave and true]].
 
 * Best quotes
-** Page 133
++ Page 133
 #+begin_quote
 To kill two birds with one stone (or feed two birds with one seed, depending on how much hippie you are.)
+#+end_quote
++ Page 147
+#+begin_quote
+The philosopher's stone, along with the exixir of life and Viagra, is one of the most well-known specimens of alchemical lore, pursued for its ability to transmute lead into gold.
 #+end_quote
