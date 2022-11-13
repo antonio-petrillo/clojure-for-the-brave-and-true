@@ -7,7 +7,7 @@ To kill two birds with one stone (or feed two birds with one seed, depending on 
 #+end_quote
 + Page 147
 #+begin_quote
-The philosopher's stone, along with the exixir of life and Viagra, is one of the most well-known specimens of alchemical lore, pursued for its ability to transmute lead into gold.
+The philosopher's stone, along with the elixir of life and Viagra, is one of the most well-known specimens of alchemical lore, pursued for its ability to transmute lead into gold.
 #+end_quote
 * Interesting execise
 + Chapter 3 exercise 6, good example on how to generalize function.

@@ -1,1 +1,132 @@
 #+title: Writing Macros
+
+* Macros are essential
+#+begin_src clojure
+(macroexpand '(when true
+                (+ 1 1)
+                (+ 2 2)
+                (+ 3 3)
+                (str "Hello " "World" "!")))
+#+end_src
+
+#+RESULTS:
+| if | true | (do (+ 1 1) (+ 2 2) (+ 3 3) (str Hello  World !)) |
+* Anatomy of a macro
+** They reminds functions
+#+begin_src clojure
+(defmacro infix
+  "Use this macro when you pine for the notation of your childhood."
+  [[operand1 operator operand2]]
+  (list operator operand1 operand2))
+
+(infix (1 + 1))
+(macroexpand '(infix (1 + 1)))
+#+end_src
+
+#+RESULTS:
+| #'user/infix |
+| 2            |
+| (+ 1 1)      |
+* A more advanced example (and macro)
+This is how the ~and~ macro is implemented in clojure.core.
+#+begin_src clojure
+(defmacro and
+  ([] true)
+  ([x] x)
+  ([x & next]
+   `(let [and# ~x]
+      (if and# (and ~@next) and#))))
+#+end_src
+* Building list for evaluation
+Macro writing is all about building a list for CLojure to evaluate.
+We need to quote stuff that we don't want to evaluate and unquote other things that we want to evaluate.
+** Distinguish symbols and values.
+Try to write a macro that print and return a value
+#+begin_src clojure
+(defmacro my-print-whoopsie
+  [expression]
+  (list let [result expression]
+        (list println result)
+        result))
+
+(defmacro my-print
+  [expression]
+  (list 'let ['result expression]
+        (list 'println 'result)
+        'result))
+#+end_src
+
+#+RESULTS:
+| class clojure.lang.Compiler$CompilerException |
+| #'user/my-print                               |
+** Simple Quoting
+#+begin_src clojure
+(+ 1 2)
+(quote (+ 1 2))
+
++
+(quote +)
+
+sweating-to-the-oldies
+(quote sweating-to-the-oldies)
+
+;; how macro is implemented.
+(defmacro when
+  "Evaluates test. If logical true, evaluates body in an implicit do."
+  {:added "1.0"}
+  [test & body]
+  (list 'if test (cons 'do body)))
+
+(defmacro unless
+  "Inverted if"
+  [test & branches]
+  (conj (reverse branches) test 'if))
+#+end_src
+
+#+RESULTS:
+| 3                                             |
+| (+ 1 2)                                       |
+| #function[clojure.core/+]                     |
+| +                                             |
+| class clojure.lang.Compiler$CompilerException |
+| sweating-to-the-oldies                        |
+| #'user/when                                   |
+** Syntax Quoting
+#+begin_src clojure
++
+'+
+`+
+#+end_src
+
+#+RESULTS:
+| #function[clojure.core/+] |
+| +                         |
+| clojure.core/+            |
+
+Note that quote a list quote *recursively* each element in the list
+
+#+begin_src clojure
+`(+ 1 (inc 1))
+#+end_src
+
+#+RESULTS:
+| clojure.core/+ | 1 | (clojure.core/inc 1) |
+
+But it is also possible to unquote a nested value.
+#+begin_src clojure
+`(+ 1 ~(inc 1))
+#+end_src
+
+#+RESULTS:
+| clojure.core/+ | 1 | 2 |
+
+An example on how to use syntax quoting (It's good to write a more coincise macro)
+#+begin_src clojure
+(list '+ 1 (inc 1))
+`(+ 1 ~(inc 1))
+#+end_src
+
+#+RESULTS:
+| (+ 1 2)              |
+| (clojure.core/+ 1 2) |
+* Using Syntax Quoting in a Macro
