@@ -130,3 +130,412 @@ An example on how to use syntax quoting (It's good to write a more coincise macr
 | (+ 1 2)              |
 | (clojure.core/+ 1 2) |
 * Using Syntax Quoting in a Macro
+** Without syntax quoting
+#+begin_src clojure
+(defmacro code-critic
+  "Phrases are courtesy Hermes Conrad from Futurama."
+  [bad good]
+  (list 'do
+        (list 'println
+              "Great squid of Madrid, this is bad code."
+              (list 'quote bad))
+        (list 'println
+              "Sweet gorilla of Manila, this is good code."
+              (list 'quote good))))
+
+(code-critic (1 + 1) (+ 1 1))
+#+end_src
+
+#+RESULTS:
+: #'user/code-critic
+** With syntax quoting
+#+begin_src clojure
+(defmacro code-critic
+  "Phrases are courtesy Hermes Conrad from Futurama."
+  [bad good]
+  `(do (println "Great squid of Madrid, this is bad code."
+                (quote ~bad))
+       (println "Sweet gorilla of Manila, this is good code."
+                (quote ~good))))
+;; if I don't put (quote ~bad) when println is evaluated also bad is evaluated, instead I want the data structure that represent bad.
+;; bad and good need to be evalutated otherwise this will print "bad" "good" instead of the value they point to.
+
+(code-critic (1 + 1) (+ 1 1))
+
+;; test
+(defmacro code-critic-bad
+  "Phrases are courtesy Hermes Conrad from Futurama."
+  [bad good]
+  `(do (println "Great squid of Madrid, this is bad code." ~bad)
+       (println "Sweet gorilla of Manila, this is good code." ~good)))
+
+;; in this case the code is so bad that if I execute it I  get an exception when (1 + 1) is evaluated
+(code-critic-bad (1 + 1) (+ 1 1))
+#+end_src
+
+#+RESULTS:
+| #'user/code-critic                 |
+| #'user/code-critic-bad             |
+| class java.lang.ClassCastException |
+* Refactoring
+** V1
+#+begin_src clojure
+(defn criticize-code
+  [criticism code]
+  `(println ~criticism (quote ~code)))
+
+(defmacro code-critic
+  [bad good]
+  `(do ~(map #(apply criticize-code %)
+             [["Great squid of Madrid, this is bad code:" bad]
+              ["Sweet gorilla of Manila, this is good code:" good]])))
+
+(code-critic (1 + 1) (+ 1 1))
+#+end_src
+
+#+RESULTS:
+| #'user/criticize-code                |
+| #'user/code-critic                   |
+| class java.lang.NullPointerException |
+
+This don't work at all, the proble here is that, when evaluated the do expression become:
+#+begin_src clojure
+(do
+  ((clojure.core/println bad-criticsm '(1 + 1))
+   (clojure.core/println good-criticsm '(1 + 1))))
+#+end_src
+Which become:
+#+begin_src clojure
+(do (nil nil))
+#+end_src
+~nil~ is the first element which cause the ~NullPointerException~ and futhermore it is not a function.
+** Quote unsplicing
+To resolve the problem of Refactoring V1 clojure provide ~quote unsplicing~, with ~~@~.
+~~@~ unwrap a seqable data structure, placing it's contents directly within the enclosing syntax quoted data structure.
+Here an example:
+#+begin_src clojure
+`(+ ~(list 1 2 3))
+(eval `(+ ~(list 1 2 3)))
+
+`(+ ~@(list 1 2 3))
+(eval `(+ ~@(list 1 2 3)))
+#+end_src
+
+#+RESULTS:
+| (clojure.core/+ (1 2 3))           |
+| class java.lang.ClassCastException |
+| (clojure.core/+ 1 2 3)             |
+| 6                                  |
+** V2
+#+begin_src clojure
+(defmacro code-critic
+  [bad good]
+  `(do ~@(map #(apply criticize-code %)
+             [["Great squid of Madrid, this is bad code:" bad]
+              ["Sweet gorilla of Manila, this is good code:" good]])))
+
+(code-critic '(1 + 1) '(+ 1 1))
+#+end_src
+
+#+RESULTS:
+: #'user/code-critic
+* Things to watch out for
+** Variable capture
+It occour, for example, when a let expression inside a macro shadow an outer binding with the same name, causing an unexpecte behaviour to the user of the macro.
+#+begin_src clojure
+(def message "Good job!")
+
+(defmacro with-mischief
+  [& stuff-to-do]
+  (concat (list 'let ['message "Oh, big deal!"])
+          stuff-to-do))
+
+(with-mischief
+  (println "Here's how I feel about that thig you did: " message))
+;; → Here's how I feel about that thig you did:  Oh, big deal!
+;; nil
+#+end_src
+
+#+RESULTS:
+| #'user/message       |
+| #'user/with-mischief |
+
+But the expected result should be:
+~Here's how I feel about that thig you did:  Good, job!~
+
+Furthermore this macro can't use syntax quoting, doing so result in an error.
+#+begin_src clojure
+(def message "Good job!")
+
+(defmacro with-mischief
+  [& stuff-to-do]
+  `(let [message "Oh, big deal!"]
+     ~@stuff-to-do))
+
+(with-mischief
+  (println "Here's how I feel about that thig you did: " message))
+#+end_src
+
+#+RESULTS:
+| #'user/message                                |
+| #'user/with-mischief                          |
+| class clojure.lang.Compiler$CompilerException |
+This is a design choice just because clojure don't want to shadow a global binding.
+To ~introduce a let binding~ inside a macro clojure provide the ~gensym~ function wich produce a unique symbols on each successive call.
+#+begin_src clojure
+(gensym)
+(gensym)
+(gensym)
+(gensym)
+#+end_src
+
+#+RESULTS:
+| G__8011 |
+| G__8014 |
+| G__8017 |
+| G__8020 |
+
+It's also possible to pass a prefix
+#+begin_src clojure
+(gensym 'message)
+(gensym 'message)
+(gensym 'message)
+(gensym 'message)
+#+end_src
+
+#+RESULTS:
+| message8023 |
+| message8026 |
+| message8029 |
+| message8032 |
+
+*** Refactoring
+#+begin_src clojure
+(defmacro without-mishchief
+  [& stuff-to-do]
+  (let [macro-message (gensym 'message)]
+    `(let [~macro-message "Oh, big deal!"]
+       ~@stuff-to-do
+       (println "I still need to say: " ~macro-message))))
+
+(without-mishchief
+ (println "Here's how I feel about that thing you did: " message))
+#+end_src
+*** Shorthand for variable capturing
+You can see an example in the ~and~ macro.
+#+begin_src clojure
+`(blarg# blarg#)
+`(my-var-# my-var-# my-var-#)
+`(let [name# "Larry Potter"] name#)
+(eval `(let [name# "Larry Potter"] name#))
+#+end_src
+
+#+RESULTS:
+| (blarg__5913__auto__ blarg__5913__auto__)                                 |
+| (my-var-__5917__auto__ my-var-__5917__auto__ my-var-__5917__auto__)       |
+| (clojure.core/let [name__5921__auto__ "Larry Potter"] name__5921__auto__) |
+| "Larry Potter"                                                            |
+** Double evaluation
+#+begin_src clojure
+(defmacro report
+  [to-try]
+  `(if ~to-try
+     (println (quote ~to-try) "was successful: " ~to-try)
+     (println (quote ~to-try) "was not successful: " ~to-try)))
+
+(report (do (Thread/sleep 1000) (+ 1 1)))
+#+end_src
+
+Here ~to-try~ is evaluated more than once, imagine that ~to-try~ is bank transfer then you are fucked.
+
+This problem could be avoided with ~gensym~ and ~auto gensym~ so you can calculate the result once and bind to a symbol.
+#+begin_src clojure
+(defmacro report
+  [to-try]
+  `(let [result# ~to-try]
+     (if result#
+       (println (quote ~to-try) "was successful: " result#)
+       (println (quote ~to-try) "was not successful: " result#))))
+#+end_src
+
+#+RESULTS:
+: #'user/report
+
+* Macros all the way down
+#+begin_src clojure :results output
+(report (= 1 1))
+(report (= 1 2))
+#+end_src
+
+#+RESULTS:
+| (= 1 1) was successful:  true      |
+| (= 1 2) was not successful:  false |
+
+Imagine that you want to call report on each element inside a seq.
+You may should write something like that:
+#+begin_src clojure :results output
+(doseq [code ['(= 1 1) '(= 1 2)]]
+  (report code))
+#+end_src
+
+#+RESULTS:
+: code was successful:  (= 1 1)
+: code was successful:  (= 1 2)
+
+But that is not what you may expect.
+This happen because the macro become:
+
+#+begin_src clojure
+(if code
+  (clojure.core/println 'code "was successful: " code)
+  (clojure.core/println 'code "was not successful: " code))
+#+end_src
+
+It receive the unevaluated symbol code, but we want what code is bound to at evaluation time.
+To resolve this problem we should use another macro.
+
+#+begin_src clojure :results output
+(defmacro doseq-macro
+  [macroname & args]
+  `(do
+     ~@(map (fn [arg] (list macroname arg)) args)))
+
+(doseq-macro  report (= 1 1) (= 1 2))
+#+end_src
+
+#+RESULTS:
+| (= 1 1) was successful:  true      |
+| (= 1 2) was not successful:  false |
+* Brews for the Brave and True
+Suppose that an order is represented by
+
+#+begin_src clojure
+(def order-details
+  {:name "Mithcard Blimmons"
+   :email "mitchard.blimmonsgmail.com"})
+#+end_src
+
+#+RESULTS:
+: #'user/order-details
+
+This order has an invalid email.
+We want a function that do the following thing
+
+#+begin_src clojure
+(validate order-details order-details-validations)
+; {:email ["Your email address doesn't look like an email address."]}
+#+end_src
+
+The following 2 functions do the job.
+#+begin_src clojure
+(def order-details-validations
+  {:name
+   ["Please enter a name" not-empty]
+   :email
+   ["Please ener an email address." not-empty
+
+   "Your email address doesn't look like an email address."
+   #(or (empty? %) (re-seq #"@" %))]})
+#+end_src
+
+#+RESULTS:
+: #'user/order-details-validations
+
+Here is the function that test for each validator:
+#+begin_src clojure
+(defn error-messages-for
+  "Return a seq of error messages."
+  [to-validate message-validator-pairs]
+  (map first (filter #(not ((second %) to-validate))
+                     (partition 2 message-validator-pairs))))
+#+end_src
+
+#+RESULTS:
+: #'user/error-messages-for
+
+At last the validate function
+
+#+begin_src clojure
+(defn validate
+  "Returns a map with a vector of errors for each key."
+  [to-validate validations]
+  (reduce (fn [errors validation]
+            (let [[fieldname validation-check-groups] validation
+                  value (get to-validate fieldname)
+                  error-messages (error-messages-for value validation-check-groups)]
+              (if (empty? error-messages)
+                errors
+                (assoc errors fieldname error-messages))))
+          {}
+          validations))
+
+(validate order-details order-details-validations)
+#+end_src
+
+#+RESULTS:
+| #'user/validate                                                     |
+| {:email ("Your email address doesn't look like an email address.")} |
+
+** If valid macro
+#+begin_src clojure
+(defn if-valid
+  [record validations succes-code failure-code]
+  (let [errors (validate record validations)]
+    (if (empty? errors)
+      succes-code
+      failure-code)))
+#+end_src
+
+This don't work because success and failure code get evaluated each time.
+We should use a macro with the following structure.
+
+#+begin_src clojure
+(let [errors (validate order-details order-details-validations)]
+  (if (empty? errors)
+    (println :success)
+    (println :failure errors)))
+#+end_src
+
+#+begin_src clojure
+(defmacro if-valid
+  "Handle validation more concisely."
+  [to-validate validations errors-name & then-else]
+  `(let [~errors-name (validate ~to-validate ~validations)]
+     (if (empty? ~errors-name)
+       ~@then-else)))
+#+end_src
+
+
+* Exercise 1
+Just like the ~if-valid~ macro in the chapter only with when instead of if
+#+begin_src clojure
+(defmacro when-valid
+  "Handle validation more concisely."
+  [to-validate validations errors-name & then-else]
+  `(let [~errors-name (validate ~to-validate ~validations)]
+     (when (empty? ~errors-name)
+       ~@then-else)))
+#+end_src
+* Exercise 2
+Write the ~or~ macro.
+#+begin_src clojure
+(defmacro or
+  ([] false)
+  ([x] x)
+  ([x & next]
+   `(let [or# x]
+      (if or# or# (or ~@ next)))))
+#+end_src
+* Exercise 3
+#+begin_src clojure
+(defmacro defattrs
+  ;; base case, no more element (I forgot this case 😓, fortunately I tested in the REPL)
+  ([] nil)
+  ;; base case with one function to create
+  ([name attr]
+  `(def ~name (comp ~attr :attributes)))
+  ([name attr & remaining]
+   `(do
+      (defattrs name attr)
+      (defatrrs ~@remaining))))
+#+end_src
