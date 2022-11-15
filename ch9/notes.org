@@ -271,7 +271,7 @@ Each query end with ~"~ so I can use a regex that unmatch until the first ~"~
 But I don't like this solution
 ** Solution
 #+begin_src clojure
-;; don't work
+;; even with #q, search?q= and search?q%3D don't work.
 (defn google-search
   "Do a google search on the given search-word"
   [search-word]
