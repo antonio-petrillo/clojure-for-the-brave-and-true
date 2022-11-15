@@ -1,1 +1,330 @@
 #+title: The sacred art of concurrent and parallel programming
+
+* Future, Delays and Promises
+** Futures
+Execute the following code in the REPL.
+#+begin_src clojure
+(future (Thread/sleep 4000)
+        (println "I'll print after 4 seconds."))
+(println "I'll print immediately.")
+#+end_src
+
+#+RESULTS:
+: Please reevaluate when nREPL is connected
+Future puts the code in another thread and execute it, when done it return the result, we can ignore the result or use it.
+Requesting a ~future result~ is called ~dereferencing the future~, it can be done with ~deref~ or ~@~ reader macro.
+A future's result value is the valure of the last expression evaluated in it's body.
+A future's body executes only once, and its value gets cached.
+#+begin_src clojure :results output
+(let [result (future (println "this prints once")
+                     (Thread/sleep 3000)
+                     (+ 1 1))]
+  (println "deref: " (deref result))
+  (println "@: " @result))
+#+end_src
+
+#+RESULTS:
+: this prints once
+: deref:  2
+: @:  2
+
+It's also possible to put a timeout to the deref, see ~(doc deref)~
+
+#+begin_src clojure
+;; the second param of deref is the timeout and the third the default value for the timeout
+(deref (future (Thread/sleep 1000) "return value") 100 5)
+#+end_src
+
+#+RESULTS:
+: 5
+
+It's also possible to check if a future call is completed with ~realized?~ predicate.
+
+#+begin_src clojure
+(realized? (future (Thread/sleep 1000)))
+
+(let [f (future)]
+  @f
+  (realized? f))
+
+(let [f (future (Thread/sleep 1000))]
+  @f
+  (realized? f))
+#+end_src
+
+#+RESULTS:
+| false |
+| true  |
+| true  |
+** Delays
+Delays allow you to define a task without having to execute it or require the result immediately.
+
+#+begin_src clojure
+(def jackson-5-delay
+  (delay (let [message "Just call my name and I'll be there"]
+           (println message)
+           message)))
+
+(force jackson-5-delay)
+#+end_src
+
+#+RESULTS:
+| #'user/jackson-5-delay                |
+| "Just call my name and I'll be there" |
+
+~force~ behave like ~deref~ but have an appropriate name for the use case.
+
+Here a more complicae example
+#+begin_src clojure
+(def gimli-headshots ["serious.jpg" "fun.jpg" "playful.jpg"])
+
+(defn email-user
+  [email-address]
+  (println "Sending headshot notification to" email-address))
+
+(defn upload-document
+  "Needs to be implemented."
+  [headshot]
+  true)
+
+(let [notify (delay (email-user "and-my-axe@gmail.com"))]
+  (doseq [headshot gimli-headshots]
+    (future (upload-document headshot)
+            (force notify))))
+#+end_src
+
+#+RESULTS:
+| #'user/gimli-headshots |
+| #'user/email-user      |
+| #'user/upload-document |
+** Promises
+Promises allow you to express that you expect a result without having to define the task that should produce it or when that task should run.
+#+begin_src clojure
+(def my-promise (promise))
+(deliver my-promise (+ 1 2))
+@my-promise
+#+end_src
+
+#+RESULTS:
+| #'user/my-promise                            |
+| #promise[{:status :ready, :val 3} 0xe35361b] |
+| 3                                            |
+
+A more complicate example:
+#+begin_src clojure
+(def yak-butter-international
+  {:store "Yak Butter International"
+   :price 90
+   :smoothness 90})
+
+(def butter-than-nothing
+  {:store "Butter than nothing"
+   :price 150
+   :smoothness 83})
+
+;; that match our criteria
+(def baby-got-yak
+  {:store "Baby Got Yak"
+   :price 94
+   :smoothness 99})
+
+(defn mock-api-call
+  [result]
+  (Thread/sleep 1000)
+  result)
+
+(defn satisfactory?
+  "If the butter meets our criteria, return the butter, else return false."
+  [butter]
+  (and (<= (:price butter) 100)
+       (>= (:smoothness butter) 97)
+       butter))
+#+end_src
+
+#+RESULTS:
+| #'user/yak-butter-international |
+| #'user/butter-than-nothing      |
+| #'user/baby-got-yak             |
+| #'user/mock-api-call            |
+| #'user/satisfactory?            |
+
+#+begin_src clojure :results output
+(time (println (some (comp satisfactory? mock-api-call) [butter-than-nothing yak-butter-international baby-got-yak])))
+#+end_src
+
+#+RESULTS:
+: {:store Baby Got Yak, :price 94, :smoothness 99}
+: "Elapsed time: 3002.994554 msecs"
+
+A better version of the last snippet with promises.
+#+begin_src clojure :results output
+(time
+ (let [butter-promise (promise)]
+   (doseq [butter [yak-butter-international butter-than-nothing baby-got-yak]]
+     (future (if-let [satisfactory-butter (satisfactory? (mock-api-call butter))]
+               (deliver butter-promise satisfactory-butter))))
+   (println "And the winner is: " @butter-promise)))
+#+end_src
+
+#+RESULTS:
+: And the winner is:  {:store Baby Got Yak, :price 94, :smoothness 99}
+: "Elapsed time: 1003.516464 msecs"
+
+If a promise never realize this become an endless waiting.
+This can be solved with a timeout.
+
+#+begin_src clojure
+(let [p (promise)]
+  (deref p 100 "timed out"))
+#+end_src
+
+#+RESULTS:
+: timed out
+
+#+begin_src clojure
+(let [ferengi-wisdom-promise (promise)]
+  (future (println "Here's some Ferengi wisdom:" @ferengi-wisdom-promise))
+  (Thread/sleep 100)
+  (deliver ferengi-wisdom-promise "Whisper your way to success."))
+#+end_src
+
+#+RESULTS:
+: #promise[{:status :ready, :val "Whisper your way to success."} 0x40324424]
+* Rolling Your Own Queue
+Write a queueing macro.
+Split a job in serial instr and concurrent instr.
+#+begin_src clojure
+(defmacro wait
+  "Sleep `timeout` seconds before evaluating body."
+  [timeout & body]
+  `(do (Thread/sleep ~timeout) ~@body))
+#+end_src
+
+#+RESULTS:
+: #'user/wait
+
+Here a snippet on how to split concurrent and serial code.
+
+#+begin_src clojure :results output
+(let [saying3 (promise)]
+  (future (deliver saying3 (wait 100 "Cheerio")))
+  @(let [saying2 (promise)]
+     (future (deliver saying2 (wait 400 "Pip pip!")))
+     @(let [saying1 (promise)]
+        (future (deliver saying1 (wait 100 "'Ello, gov'na!")))
+        (println @saying1)
+        saying1)
+     (println @saying2)
+     saying2)
+  (println @saying3)
+  saying3)
+#+end_src
+
+#+RESULTS:
+: 'Ello, gov'na!
+: Pip pip!
+: Cheerio
+
+Here the macro that abstract this code
+#+begin_src clojure
+(defmacro enqueue
+  ([q concurrent-promise-name concurrent serialized]
+   `(let [~concurrent-promise-name (promise)]
+      (future (deliver ~concurrent-promise-name ~concurrent))
+      (deref ~q)
+      ~serialized
+      ~concurrent-promise-name))
+  ([concurrent-promise-name concurrent serialized]
+   `(enqueue (future) ~concurrent-promise-name ~concurrent ~serialized)))
+#+end_src
+
+#+RESULTS:
+: #'user/enqueue
+
+#+begin_src clojure :results output
+(time @(-> (enqueue saying (wait 200 "'Ello, gov'na!") (println @saying))
+           (enqueue saying (wait 400 "Pip pip!") (println @saying))
+           (enqueue saying (wait 100 "Cheerio!") (println @saying))))
+#+end_src
+
+#+RESULTS:
+: 'Ello, gov'na!
+: Pip pip!
+: Cheerio!
+: "Elapsed time: 401.595555 msecs"
+* Exercise 1
+Write a function that takes a string as an argument and searches for it on Bing and Google using the slurp function.
+Your function should return the HTML of the first page returned by the search.
+** Here an example
+#+begin_src clojure
+(slurp "https://google.com/#q=what-you-want-to-search")
+#+end_src
+Then I can process the output, with a regex.
+#+begin_src clojure
+(re-find #"https://.+" (slurp "https://google.com/#q=what-you-want-to-search"))
+#+end_src
+Note that with this regex I also put the query in output which I don't want.
+Each query end with ~"~ so I can use a regex that unmatch until the first ~"~
+#+begin_src clojure
+(apply str (rest (drop-while #(not= % \") (re-find #"https://.+" (slurp "https://google.com/#q=what-you-want-to-search")))))
+#+end_src
+But I don't like this solution
+** Solution
+#+begin_src clojure
+;; don't work
+(defn google-search
+  "Do a google search on the given search-word"
+  [search-word]
+  @(future (slurp (str "https://google.com/search?q%3D" search-word))))
+
+(defn bing-search
+  "Do a bing search on the given search-word"
+  [search-word]
+  @(future (slurp (str "https://bing.com/search?q=" search-word))))
+
+;; Idiot!!!
+;; Don't work as expected, can't use a macro for this.
+;; Once loaded, output have only one name.
+;; (defmacro spit-output
+;;   [html-page]
+;;   `(let [output# nil]
+;;     (spit (str (quote output#) ".html") ~html-page)))
+
+;; (defn spit-first-HTML-page
+;;   [search-result]
+;;   (spit-output search-result))
+
+;; for this I don't need macros.
+(defn spit-first-HTML-page
+  [search-result]
+  (spit (str (gensym 'output-) ".html") search-result))
+#+end_src
+
+#+RESULTS:
+| #'user/google-search        |
+| #'user/bing-search          |
+| #'user/spit-output          |
+| #'user/spit-first-HTML-page |
+* Exercise 2
+Update your function so it takes a second argument consisting of the search engines to use.
+#+begin_src clojure
+(defn search
+  "Do a bing search on the given search-word"
+  [search-word search-engine]
+  @(future (slurp (str "https://" search-engine ".com/search?q=" search-word))))
+#+end_src
+
+#+RESULTS:
+: #'user/search
+* Exercise 3
+Create a new function that takes a search term and search engines as arguments, and returns a vector of the URLs from the first page of search results from each search engine.
+#+begin_src clojure
+(defn extract-URLs
+  [html-page]
+  (into [] (re-seq #"https://[^\"]*" html-page)))
+#+end_src
+
+#+RESULTS:
+: #'user/extract-URLs
+* Note on the exercise
+I implemented the exercise in a way that when I call ~search~ it return the result of the search, but since the other function work on the html page I can return a future.
