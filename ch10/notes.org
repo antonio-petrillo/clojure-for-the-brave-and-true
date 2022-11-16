@@ -1,1 +1,98 @@
 #+title: Clojure metaphysics: atoms, refs, vars, and cuddel zombies.
+
+* Object Oriented Metaphyisic
+#+begin_src java :results output
+public class CuddleZombie{
+		private int cudgeLevel;
+		private int percentDeteriorated;
+
+		public CuddleZombie(int cudgeLevel, int percentDeteriorated){
+				this.cudgeLevel = cudgeLevel;
+				this.percentDeteriorated = percentDeteriorated;
+		}
+
+		public int getCudgeLevel(){
+				return cudgeLevel;
+		}
+
+		public int getPercentDeteriorated(){
+				return percentDeteriorated;
+		}
+
+		public void setCudgeLevel(int cudgeLevel){
+				this.cudgeLevel = cudgeLevel;
+		}
+
+		public void setPercentDeteriorated(int percentDeteriorated){
+				this.percentDeteriorated = percentDeteriorated;
+		}
+
+		public static void main(String[] args){
+				var fred = new CuddleZombie(2, 3);
+				System.out.println(fred.getCudgeLevel());
+				System.out.println(fred.getPercentDeteriorated());
+
+				fred.setCudgeLevel(1);
+				fred.setPercentDeteriorated(1);
+				System.out.println(fred.getCudgeLevel());
+				System.out.println(fred.getPercentDeteriorated());
+		}
+}
+#+end_src
+
+#+RESULTS:
+: 2
+: 3
+: 1
+: 1
+
+Suppose you want to analyze a cuddle zombie when the ~cuddle level~ is 50 or more, and suppose you want to analyze it in another thread to increase performance.
+
+#+begin_src java
+if fred.getCudgeLevel() >= 50 {
+		new Thread(() -> {
+						databaseLogger.log(fred);
+		});
+}
+#+end_src
+
+The problem is that another thread can change fred cuddle level while it is logging.
+To solve this problem we need a ~mutex~ while working on fred.
+* Clojure Metaphysic
+In clojure metaphysics, we would say that we never encounter the same cuddle zombies twice.
+The cuddle zombie is not a discrete thing that exists in the world independent of its mutations: it's actually a succession of values.
+* Atoms
+#+begin_src clojure
+(def fred (atom {:cuddle-level 0
+                 :percent-deteriorated 0}))
+#+end_src
+
+#+RESULTS:
+: #'user/fred
+
+Here the snippet on how to log fred cuddle level.
+#+begin_src clojure
+(let [zombie-state @fred]
+  (if (>= (:percent-deterioarated zombie-state) 50)
+    (future (println (:percent-deteriorated zombie-state)))))
+#+end_src
+
+We can change the atom reference with ~swap!~
+
+#+begin_src clojure
+(swap! fred
+       (fn [current-state]
+         (merge-with + current-state {:cuddle-level 1})))
+#+end_src
+
+We can't update fred with a function
+#+begin_src clojure
+(defn increase-cuddle-level
+  [zombie-state increase-by]
+  (merge-with + zombie-state {:cuddle-level increase-by}))
+#+end_src
+
+But we can use the function inside a ~swap!~ call.
+#+begin_src clojure
+(swap! increase-cuddle-level @fred 10)
+#+end_src
