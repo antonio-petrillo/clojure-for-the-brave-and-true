@@ -1,0 +1,1 @@
+#+title: Clojure metaphysics: atoms, refs, vars, and cuddel zombies.
