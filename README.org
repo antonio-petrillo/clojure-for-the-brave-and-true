@@ -9,6 +9,11 @@ To kill two birds with one stone (or feed two birds with one seed, depending on 
 #+begin_quote
 The philosopher's stone, along with the elixir of life and Viagra, is one of the most well-known specimens of alchemical lore, pursued for its ability to transmute lead into gold.
 #+end_quote
++ Page 265
+#+begin_quote
+Take a minute to contemplate how great it is to be one of Mother Nature's top-of-the-line products: a human.
+As a human, you get to gossip on social media, play Dungeons and Dragons, and wear hats.
+#+end_quote
 * Interesting execise
 + Chapter 3 exercise 6, good example on how to generalize function.
 + Chapter 4 exercise 4 & 5, implement ~assoc-in~ and ~update-in~

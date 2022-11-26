@@ -1,0 +1,320 @@
+#+title: creating and extending abstracions with multimethods, protocols, and records.
+
+* Multimethod
+#+begin_src clojure
+(ns were-creatures)
+
+(defmulti full-moon-behavior (fn [were-creature] (:were-type were-creature)))
+
+(defmethod full-moon-behavior :wolf
+  [were-creature]
+  (str (:name were-creature) " will howl and murder."))
+
+(defmethod full-moon-behavior :simmons
+  [were-creature]
+  (str (:name were-creature) " will encourage people and sweat to the oldies."))
+
+(defmethod full-moon-behavior nil
+  [were-creature]
+  (str (:name were-creature) " will stay at home and eat ice cream."))
+
+(defmethod full-moon-behavior :default
+  [were-creature]
+  (str (:name were-creature) " will stay up all night fantasy footballing."))
+
+(full-moon-behavior {:were-type :wolf
+                     :name "Rachel from next door"})
+
+(full-moon-behavior {:were-type :simmons
+                     :name "Andy the baker"})
+
+(full-moon-behavior {:were-type nil
+                     :name "Martin the nurse"})
+
+(full-moon-behavior {:were-type :default
+                     :name "Jimmy form sales"})
+#+end_src
+
+#+RESULTS:
+| #'were-creatures/full-moon-behavior                             |
+| #multifn[full-moon-behavior 0x1b9b0f5d]                         |
+| #multifn[full-moon-behavior 0x1b9b0f5d]                         |
+| #multifn[full-moon-behavior 0x1b9b0f5d]                         |
+| #multifn[full-moon-behavior 0x1b9b0f5d]                         |
+| "Rachel from next door will howl and murder."                   |
+| "Andy the baker will encourage people and sweat to the oldies." |
+| "Martin the nurse will stay at home and eat ice cream."         |
+| "Jimmy form sales will stay up all night fantasy footballing."  |
+* Protocols
+#+begin_src clojure
+(ns data-psychology)
+
+(defprotocol Psychodynamics
+  "Plumb the inner depths of your data types"
+  (thoughts [x] "The data type's innermost thoughts")
+  (feelings-about [x] [x y] "Feeling about self or other"))
+#+end_src
+
+#+RESULTS:
+: Psychodynamics
+
+#+begin_src clojure
+(ns data-psychology)
+(extend-type java.lang.String
+  Psychodynamics
+  (thoughts [x] (str x " thinks, 'Truly, the character defines the data types'"))
+  (feelings-about
+    ([x] (str x " is loving for a simpler way of life"))
+    ([x y] (str x " is envious of " y "'s simpler way of life"))))
+
+(thoughts "blorb")
+
+(feelings-about "schmorb")
+(feelings-about "schmorb" 2)
+#+end_src
+
+#+RESULTS:
+| "blorb thinks, 'Truly, the character defines the data types'" |
+| "schmorb is loving for a simpler way of life"                 |
+| "schmorb is envious of 2's simpler way of life"               |
+
+An implementation that work with everything will extend java ~Object~.
+
+#+begin_src clojure
+(ns data-psychology)
+(extend-type java.lang.Object
+  Psychodynamics
+  (thoughts [x] "Maybe the Internet is just a vector for toxoplasmosis")
+  (feelings-about
+    ([x] "meh")
+    ([x y] (str x " meh about " y))))
+
+(thoughts 3)
+
+(feelings-about 3)
+(feelings-about 3 "blorb")
+#+end_src
+
+#+RESULTS:
+| "Maybe the Internet is just a vector for toxoplasmosis" |
+| "meh"                                                   |
+| "3 meh about blorb"                                     |
+
+#+begin_src clojure
+(ns data-psychology)
+(extend-protocol Psychodynamics
+  java.lang.String
+  (thoughts [x] "Truly, the character defines the data types")
+  (feeling-about
+    ([x] "longing for a simpler way of life")
+    ([x y] (str "envious of " y "'s simpler way of life")))
+  java.lang.Object
+  (thoughts [x] "Maybe the internet is just a vector for toxoplasmosis")
+  (feeling-about
+    ([x] "meh")
+    ([x y] (str "meh about " y))))
+#+end_src
+
+#+RESULTS:
+
+* Records
+Records are custom, maplike data types.
+#+begin_src clojure
+(ns were-records)
+
+(defrecord WereWolf [name title])
+
+(WereWolf. "David" "London Tourist")
+
+(->WereWolf "Jacob" "Lead Shirt Discarder")
+
+(map->WereWolf {:name "Lucian" :title "CEO of Melodrama"})
+#+end_src
+
+#+RESULTS:
+| were_records.WereWolf                                                |
+| #were_records.WereWolf{:name "David", :title "London Tourist"}       |
+| #were_records.WereWolf{:name "Jacob", :title "Lead Shirt Discarder"} |
+| #were_records.WereWolf{:name "Lucian", :title "CEO of Melodrama"}    |
+
+#+begin_src clojure
+(ns monster-mash
+  (:import [were_records WereWolf]))
+
+(WereWolf. "David" "London Tourist")
+#+end_src
+
+#+RESULTS:
+: #were_records.WereWolf{:name "David", :title "London Tourist"}
+
+#+begin_src clojure
+(def jacob (->WereWolf "Jacob" "Lead Shirt Discarder"))
+
+(.name jacob)
+
+(:name jacob)
+
+(get jacob :name)
+#+end_src
+
+#+RESULTS:
+| #'were-records/jacob |
+| "Jacob"              |
+| "Jacob"              |
+| "Jacob"              |
+
+#+begin_src clojure
+(= jacob (->WereWolf "Jacob" "Lead Shirt Discarder"))
+
+(= jacob (WereWolf. "David" "London Tourist"))
+
+(= jacob {:name "Jacob" :title "Lead Shirt Discarder"})
+#+end_src
+
+#+RESULTS:
+| true  |
+| false |
+| false |
+
+#+begin_src clojure
+(assoc jacob :title "Lead Third Wheel")
+
+(dissoc jacob :title)
+#+end_src
+
+#+RESULTS:
+| #were_records.WereWolf{:name "Jacob", :title "Lead Third Wheel"} |
+| {:name "Jacob"}                                                  |
+
+#+begin_src clojure
+(ns were-records)
+(defprotocol WereCreature
+  (full-moon-behavior [x]))
+
+(defrecord WereWolf [name title]
+  WereCreature
+  (full-moon-behavior [x]
+    (str name " will howl and murder")))
+
+(full-moon-behavior (map->WereWolf {:name "Lucian" :title "CEO of Melodrama"}))
+#+end_src
+
+#+RESULTS:
+| WereCreature                  |
+| were_records.WereWolf         |
+| "Lucian will howl and murder" |
+* Exercise 1
+Extend full-moon-behavior multimethod to add behavior for your own kind of were-creature
+#+begin_src clojure
+(ns were-creatures)
+
+(defmethod full-moon-behavior :pidgeon
+  [were-creature]
+  (str (:name were-creature) " will stay up all night and annoy you at bar ranting about Jehovah's Witnesses."))
+
+(full-moon-behavior {:were-type :pidgeon
+                     :name "Josheph the pidgeon"})
+#+end_src
+
+#+RESULTS:
+| #multifn[full-moon-behavior 0x1b9b0f5d]                                                              |
+| "Josheph the pidgeon will stay up all night and annoy you at bar ranting about Jehovah's Witnesses." |
+* Exercise 2
+Create a ~WereSimmons~ record type, and then extend the WereCreature protocol
+#+begin_src clojure
+(ns were-creatures)
+
+(defprotocol WereCreature
+  (full-moon-behavior [x]))
+
+(defrecord WereSimmon [name title]
+    WereCreature
+  (full-moon-behavior [x]
+    (str (:name x) " will encourage people and sweat to the oldies.")))
+#+end_src
+
+#+RESULTS:
+| WereCreature              |
+| were_creatures.WereSimmon |
+* Exercise 3
+Create your own protocol, and then extend it using extend-type and extend-protocol.
+#+begin_src clojure
+(ns role-play-game)
+
+(defprotocol GameCharacter
+  (attack [x]))
+
+(extend-type java.lang.String
+  GameCharacter
+  (attack [x] (str x " attack you with the power of String.")))
+
+(extend-type java.lang.Number
+  GameCharacter
+  (attack [x] (str x " attack you with the power of Numbers.")))
+
+(attack "ciao")
+(attack 3)
+(attack 3.14)
+
+(extend-protocol GameCharacter
+  java.lang.Character
+  (attack [x] (str x " attack you with the power of Characters"))
+  java.lang.Exception
+  (attack [x] (str x " attack yout with the power of Exceptions"))
+  java.lang.Object
+  (attack [x] (str x " attack you with the power of the mother class Object")))
+
+(attack (java.lang.Character. \a))
+(attack (new IllegalArgumentException))
+(attack (ArrayIndexOutOfBoundsException.))
+(attack (java.lang.Object. ))
+#+end_src
+
+#+RESULTS:
+| GameCharacter                                                                       |
+| "ciao attack you with the power of String."                                         |
+| "3 attack you with the power of Numbers."                                           |
+| "3.14 attack you with the power of Numbers."                                        |
+| "a attack you with the power of Characters"                                         |
+| "java.lang.IllegalArgumentException attack yout with the power of Exceptions"       |
+| "java.lang.ArrayIndexOutOfBoundsException attack yout with the power of Exceptions" |
+| "java.lang.ArrayIndexOutOfBoundsException attack yout with the power of Exceptions" |
+| "java.lang.Object@a6e2784 attack you with the power of the mother class Object"     |
+* Exercise 4
+Create a role-playing game that implements behavior using multiple dispatch.
+A little bit to long a will show only an attack multimethods.
+#+begin_src clojure
+(defmulti attack (fn [character] (:type character)))
+
+(defmethod attack :mage
+  [character]
+  (str (:name character) " attack with the power of magic."))
+
+(defmethod attack :thief
+  [character]
+  (str (:name character) " attack with the power of backstab."))
+
+(defmethod attack :warrior
+  [character]
+  (str (:name character) " attack with the power of battleaxe."))
+
+(defmethod attack :little-teapot
+  [character]
+  (str (:name character) " attack with the power of clojure for the brave and true."))
+
+(attack {:name "Ganjalf" :type :mage})
+(attack {:name "Ganjstab" :type :thief})
+(attack {:name "Ganjaxe" :type :warrior})
+(attack {:name "Nto" :type :little-teapot})
+#+end_src
+
+#+RESULTS:
+| #'role-play-game/attack                                        |
+| #multifn[attack 0xefc3fe9]                                     |
+| #multifn[attack 0xefc3fe9]                                     |
+| #multifn[attack 0xefc3fe9]                                     |
+| #multifn[attack 0xefc3fe9]                                     |
+| "Ganjalf attack with the power of magic."                      |
+| "Ganjstab attack with the power of backstab."                  |
+| "Ganjaxe attack with the power of battleaxe."                  |
+| "Nto attack with the power of clojure for the brave and true." |
