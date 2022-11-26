@@ -74,7 +74,7 @@ Delays allow you to define a task without having to execute it or require the re
 
 ~force~ behave like ~deref~ but have an appropriate name for the use case.
 
-Here a more complicae example
+Here a more complicate example
 #+begin_src clojure
 (def gimli-headshots ["serious.jpg" "fun.jpg" "playful.jpg"])
 
